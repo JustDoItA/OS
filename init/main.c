@@ -7,10 +7,13 @@
 #define __LIBRARY__
 
 extern void mem_init(long start, long end);
+extern long rd_init(long mem_start, int length);
 extern long kernel_mktime(struct tm *tm);
 extern long startup_time;
 
+//EXT_MEM_K 64515kb
 #define EXT_MEM_K (*(unsigned short *) 0x90002)
+//0x306
 #define ORIG_ROOT_DEV (*(unsigned short *) 0x901FC)
 #define DRIVE_INFO (*(struct drive_info *) 0x90080)
 
@@ -62,9 +65,10 @@ int main(void){
         buffer_memory_end = 1*1024*1024;
     main_memory_start = buffer_memory_end;
 #ifdef RAMDISK
-    main_memory_start += rd_init(main_memory_start, RMDISK*1024);
+    //如果定义了虚拟盘，则将组内存其实部分分给虚拟盘
+    main_memory_start += rd_init(main_memory_start, RAMDISK*1024);
 #endif
-    //mem_init(main_memory_start,memory_end);
+    mem_init(main_memory_start,memory_end);
     time_init();
     //struct test T1;
     //T1.b = 8;

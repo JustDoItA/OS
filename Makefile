@@ -1,4 +1,4 @@
-RAMDISK = #-DRAMDISK = 512
+RAMDISK = -DRAMDISK=512
 MAKE = make
 
 AS86 = as86 -O -a
@@ -19,8 +19,8 @@ CFLAGS =-Wall -O0 -g -fomit-frame-pointer
 CPP =cpp -nostdine -Iinclude
 
 ROOT_DEV=/dev/hd6
-ARCHIVES=kernel/kernel.o fs/fs.o # mm/mm.o
-DRIVERS=kernel/blk_drv.a kernel/chr_drv.a
+ARCHIVES=kernel/kernel.o fs/fs.o  mm/mm.o kernel/math/math.a
+DRIVERS=kernel/blk_drv/blk_drv.a #kernel/chr_drv.a
 MATH = kernel/math/math.a
 LIBS = lib/lib.a
 
@@ -42,9 +42,12 @@ disk:
 
 clean:
 	rm -f Image System.map boot/bootsect boot/setup boot.img
-	rm -f init/*.o tools/system tools/sys
+	rm -f init/*.o tools/system tools/sys boot/head.o
 	(cd kernel; make clean)
+	(cd kernel/math; make clean)
+	(cd kernel/blk_drv; make clean)
 	(cd fs; make clean)
+	(cd mm; make clean)
 
 boot/bootsect: boot/boot.asm
 	$(NASM) -o boot/bootsect boot/boot.asm
@@ -53,9 +56,10 @@ boot/setup: boot/setup.asm
 boot/head.o: boot/head.s
 tools/system: boot/head.o init/main.o
 	(cd kernel; make)
+	(cd kernel/math; make)
+	(cd kernel/blk_drv; make)
 	(cd fs; make)
-	$(LD) $(LDFLAGS) boot/head.o init/main.o $(ARCHIVES) -o tools/sys > System.map
+	(cd mm; make)
+	$(LD) $(LDFLAGS) boot/head.o init/main.o $(ARCHIVES) $(DRIVERS) -o tools/sys > System.map
 	objcopy -O binary -S tools/sys tools/system
-kernel/kernel.o:
-	(cd kernel; make)
 init/main.o : init/main.c include/time.h include/linux/sched.h include/linux/head.h

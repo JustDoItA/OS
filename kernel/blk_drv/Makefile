@@ -16,8 +16,8 @@ CPP =gcc -E -nostdinc -I../../include
 
 OBJS = ll_rw_blk.o ramdisk.o #floppy.o
 
-blk_drv.o: $(OBJS)
-	$(AR)  blk_drv.o $(OBJS)
+blk_drv.a: $(OBJS)
+	$(AR)  blk_drv.a $(OBJS)
 	sync
 clean:
 	rm -f core *.o *.a
@@ -25,4 +25,6 @@ clean:
 floppy.s floppy.o : floppy.c ../../include/linux/sched.h \
 	../../include/linux/head.h ../../include/linux/fs.h \
 	../../include/sys/types.h
-ll_rw_blk.s ll_rw_blk.o : ll_rw_blk.c ../../include/linux/fs.h blk.h
+ll_rw_blk.s ll_rw_blk.o : ll_rw_blk.c ../../include/linux/fs.h blk.h \
+	../../include/linux/kernel.h ../../include/linux/sched.h \
+	../../include/asm/system.h

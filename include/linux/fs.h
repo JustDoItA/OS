@@ -9,6 +9,8 @@
 
 #define READ 0
 #define WRITE 1
+#define READA 2
+#define WRITEA 3
 
 
 #define MAJOR(a) (((unsigned)(a))>>8)
@@ -16,25 +18,33 @@
 
 #define NR_OPEN 20
 
+
+
+#define NR_HASH 307
+
+#define BLOCK_SIZE 1024
+
 #ifndef NULL
 #define NULL ((void *) 0)
 #endif
 
 extern int ROOT_DEV;
 
+//缓冲区头
 struct buffer_head {
-    char * b_data;
-    unsigned long b_blocknr;
-    unsigned short b_dev;
-    unsigned char b_uptodate;
-    unsigned char b_dirt;
-    unsigned char b_count;
-    unsigned char b_lock;
-    struct task_struct * b_wait;
-    struct buffer_head * b_prev;
-    struct buffer_head * b_next;
-    struct buffer_head * b_prev_free;
-    struct buffer_head * b_next_free;
+    char * b_data;                          //指向数据区的指针
+    unsigned long b_blocknr;                //块号
+    unsigned short b_dev;                   //数据源的设备号
+    unsigned char b_uptodate;               //更新标志，表示数据是否已更新
+    unsigned char b_dirt;                   //修改标志： 0 未修改，1 已修改
+    unsigned char b_count;                  //使用的用户数
+    unsigned char b_lock;                   //缓冲区是否被锁定
+    struct task_struct * b_wait;            //指向缓冲区解锁的任务(linux/include/sched.h)
+    //以下4个指针用于缓冲区的管理
+    struct buffer_head * b_prev;            //hash 队列上前一块
+    struct buffer_head * b_next;            //hash 队列上下一块
+    struct buffer_head * b_prev_free;       //空闲表的前一块
+    struct buffer_head * b_next_free;       //空闲表的下一块
 };
 
 struct m_inode{
@@ -45,6 +55,7 @@ struct m_inode{
     unsigned char i_gid;
     unsigned char i_nlinks;
     unsigned short i_zone[9];
+
 
     struct task_struct * i_wait;
     unsigned long i_atime;
@@ -67,4 +78,14 @@ struct file {
     struct m_inode * f_inode;
     off_t f_pos;
 };
+
+extern int bmap(struct m_inode *inde, int block);
+extern void ll_rw_block(int rw, struct buffer_head * bh);
+extern void brelse(struct buffer_head *buf);
+
+extern struct buffer_head * bread(int dev, int block);
+extern void bread_page(unsigned long addr, int dev, int b[4]);
+
+extern int new_block(int dev);
+
 #endif

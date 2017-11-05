@@ -8,7 +8,7 @@
 
 char *rd_start;
 int rd_length = 0;
-
+//执行虚拟盘的读写操作
 void do_rd_request(void)
 {
     int len;
@@ -32,6 +32,8 @@ void do_rd_request(void)
     goto repeat;
 }
 
+// 返回虚拟盘ramdisk 所需的内存量
+// 虚拟盘初始化函数， 确定虚拟盘在内存中的起始地址长度。并对整个虚拟盘清0
 long rd_init(long mem_start, int length)
 {
     int i;

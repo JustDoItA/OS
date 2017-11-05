@@ -20,7 +20,7 @@ static union task_union init_task = {INIT_TASK,};
 
 long volatile jiffies = 0;
 
-struct task_struct *current = &(init_task);
+struct task_struct *current = &(init_task.task);
 struct task_struct *last_task_used_math = NULL;
 
 struct task_struct * task[NR_TASKS] = {&(init_task.task)};
@@ -33,6 +33,23 @@ struct {
     short b;
 } stack_start = { & user_stack [PAGE_SIZE>>2] , 0x10};
 //} stack_start = { 0x7c00 , 0x0010};
+
+void math_state_restore(){
+    if(last_task_used_math == current){
+        return;
+    }
+    __asm__("fwait");
+    if(last_task_used_math){
+        __asm__("fnsave %0"::"m" (last_task_used_math->tss.i387));
+    }
+    last_task_used_math = current;
+    if(current->used_math){
+        __asm__("fnsave %0"::"m" (current->tss.i387));
+    }else{
+        __asm__("fninit"::);
+        current -> used_math = 1;
+    }
+}
 
 void schedule(void){
     int i,next,c;

@@ -12,12 +12,14 @@ CPP = gcc -E -nostdinc -I../include
 	$(AS) -c -o $*.o $<
 .c.o:
 	$(CC) $(CFLAGS) -c -o $*.o $<
-OBJS = super.o buffer.o
+OBJS = super.o buffer.o inode.o
 
 fs.o: $(OBJS)
 	$(LD) -r -o fs.o $(OBJS)
 clean:
 	rm -f core *.o *.a
 
-buffer.o : buffer.c
+buffer.o : buffer.c ../include/linux/fs.h
 super.o : super.c ../include/linux/fs.h
+inode.o : inode.c ../include/linux/fs.h ../include/linux/kernel.h \
+	../include/linux/sched.h
