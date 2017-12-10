@@ -502,19 +502,20 @@ void con_init(void){
     char *display_ptr;
 
     video_num_columns = ORIG_VIDEO_COLS; //显示器显示字符列数(80)
-    video_size_row = video_num_columns * 2; //每行需要使用的字节数
-    video_num_lines = ORIG_VIDEO_LINES; //显示器显示字符行数
-    video_page = ORIG_VIDEO_PAGE; //当前显示页面
+    video_size_row = video_num_columns * 2; //每行需要使用的字节数(160)
+    video_num_lines = ORIG_VIDEO_LINES; //显示器显示字符行数(25)
+    video_page = ORIG_VIDEO_PAGE; //当前显示页面 (0)
     video_erase_char = 0x0720; //擦除字符（0x20显示字符，0x07属性）
 
+    //ORIG_VIDEO_MODE = 7 单色显示器
     if(ORIG_VIDEO_MODE == 7){
-        video_mem_start = 0xb0000;
-        video_port_reg = 0x3b4;
-        video_port_val = 0x3b5;
+        video_mem_start = 0xb0000;  //设置单显影像内存起始地址
+        video_port_reg = 0x3b4;    //设置单显索引寄存器端口
+        video_port_val = 0x3b5;    //设置单显数据寄存器端口
         if((ORIG_VIDEO_EGA_BX) != 0x10){
-            video_type = VIDEO_TYPE_EGAM;
-            video_mem_end = 0xb8000;
-            display_desc = "EGAm";
+            video_type = VIDEO_TYPE_EGAM; //设置显示类型EGA单色 (33 '!')
+            video_mem_end = 0xb8000;      //设置显示内存末端地址
+            display_desc = "EGAm";       //设置显示描述字符串
         }else{
             video_type = VIDEO_TYPE_MDA;
             video_mem_end = 0xb2000;
@@ -535,21 +536,27 @@ void con_init(void){
         }
     }
 
+    //在屏幕右上角显示描述字符串，采用的方法是直接将字符串写到显示内存的相应位置处
+    //首先将显示指针display_ptr
+    //指到屏幕第一行右端差4个字符处（每个字符需要2个字节）
+    //因此减8
     display_ptr = ((char *)video_mem_start) + video_size_row -8;
+    //然后循环复制字符串中的字符，并且每复制一个字符都空开一个属性字节
     while(*display_desc){
-        *display_ptr++ = *display_desc++;
-        display_ptr++;
+        *display_ptr++ = *display_desc++; //复制字符
+        display_ptr++;  //空开属性字节位置
     }
-    origin = video_mem_start;
-    scr_end = video_mem_start + video_num_lines * video_size_row;
-    top = 0;
-    bottom = video_num_lines;
+    //初始化用于滚屏的变量（主要用于EGA/VGA）
+    origin = video_mem_start; //滚屏起始显示内存地址
+    scr_end = video_mem_start + video_num_lines * video_size_row;  //滚屏结束内存地址(774048)
+    top = 0; //最顶行号
+    bottom = video_num_lines; //最底行号(25)
 
-    gotoxy(ORIG_X, ORIG_Y);
-    set_trap_gate(0x21, &keyboard_interrupt);
-    outb_p(inb_p(0x21)&0xfd,0x21);
-    a = inb_p(0x61);
-    outb_p(a|0x80,0x61);
-    outb(a, 0x61);
+    gotoxy(ORIG_X, ORIG_Y); //初始化光标位置x,y,和对应的内存位置pos
+    set_trap_gate(0x21, &keyboard_interrupt); //设置键盘中断陷阱门
+    outb_p(inb_p(0x21)&0xfd,0x21); //取消8259A中对键盘的中断屏蔽，允许IRQ1
+    a = inb_p(0x61); //延迟读取键盘端口0x61（8255A端口PB）
+    outb_p(a|0x80,0x61); //设置禁止键盘工作（位7置位）
+    outb(a, 0x61); //再次允许键盘工作，用于复位键盘操作
 }
 
