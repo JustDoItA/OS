@@ -13,6 +13,7 @@ sa_handler = 0
 
 sa_restorer = 12
 
+.global sys_fork
 .global parallel_interrupt
 .global device_not_available, coprocessor_error
 
@@ -92,3 +93,17 @@ parallel_interrupt:
     outb %al,$0x20
     popl %eax
     iret
+
+.align 4
+sys_fork:
+    call find_empty_process
+    testl %eax, %eax
+    js 1f
+    push %gs
+    pushl %esi
+    pushl %edi
+    pushl %ebp
+    pushl %eax
+    call copy_process
+    addl $20, %esp
+1:  ret

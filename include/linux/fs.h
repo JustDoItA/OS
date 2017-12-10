@@ -16,13 +16,18 @@
 #define MAJOR(a) (((unsigned)(a))>>8)
 #define MINOR(a) ((a)&0xff)
 
+#define SUPER_MAGIC 0x137F
+
 #define NR_OPEN 20
+
+#define NR_BUFFERS nr_buffers
 
 
 
 #define NR_HASH 307
 
 #define BLOCK_SIZE 1024
+#define BLOCK_SIZE_BITS 10
 
 #ifndef NULL
 #define NULL ((void *) 0)
@@ -79,13 +84,47 @@ struct file {
     off_t f_pos;
 };
 
+struct super_block {
+    unsigned short s_ninodes;
+    unsigned short s_nzones;
+    unsigned short s_imap_blocks;
+    unsigned short s_firstdatazone;
+    unsigned short s_log_zone_size;
+    unsigned short s_max_size;
+    unsigned short s_magic;
+
+    struct buffer_head * s_imap[8];
+    struct buffer_head * s_zmap[8];
+    unsigned short s_dev;
+    struct m_inode * s_isup;
+    struct m_inode * s_imount;
+    unsigned long s_time;
+    struct task_struct * s_wait;
+    unsigned char s_lock;
+    unsigned char s_rd_only;
+    unsigned char s_dirt;
+};
+
+struct d_super_block {
+    unsigned short s_ninodes;
+    unsigned short s_nzones;
+    unsigned short s_imap_blocks;
+    unsigned short s_zmap_blocks;
+    unsigned short s_firstdatazone;
+    unsigned short s_log_zone_size;
+    unsigned long s_max_size;
+    unsigned short s_magic;
+};
+
+extern int nr_buffers;
+
 extern int bmap(struct m_inode *inde, int block);
 extern void ll_rw_block(int rw, struct buffer_head * bh);
 extern void brelse(struct buffer_head *buf);
 
 extern struct buffer_head * bread(int dev, int block);
 extern void bread_page(unsigned long addr, int dev, int b[4]);
-
+extern struct buffer_head * breada(int dev, int block, ...);
 extern int new_block(int dev);
 
 #endif

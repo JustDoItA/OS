@@ -1,11 +1,29 @@
 #include "asm/io.h"
 #include <time.h>
 
+#define __LIBRARY__
+#include <unistd.h>
+
+
+
+static inline _syscall0(int, fork)
+static inline _syscall0(int, pause)
+static inline _syscall1(int, setup, void *, BIOS)
+static inline _syscall0(int, sync)
+
+#include <linux/tty.h>
+#include <linux/sched.h>
+
 #include <linux/fs.h>
 #include <linux/head.h>
+#include <asm/system.h>
+#include <fcntl.h>
+#include <stdarg.h>
 
-#define __LIBRARY__
+static char printbuf[1024];
 
+extern int vsprintf();
+extern void init(void);
 extern void mem_init(long start, long end);
 extern long rd_init(long mem_start, int length);
 extern long kernel_mktime(struct tm *tm);
@@ -69,9 +87,88 @@ int main(void){
     main_memory_start += rd_init(main_memory_start, RAMDISK*1024);
 #endif
     mem_init(main_memory_start,memory_end);
+    trap_init();
+    tty_init();
     time_init();
+
+
+
+    sti();
+    move_to_user_mode();
+
+    if(!fork()){
+        init();
+    }
+
+
+    for(;;){
+        pause();
+    }
+
     //struct test T1;
     //T1.b = 8;
     //printf("Hello %d World!\n",T1.b);
     return 0;
+}
+
+static int printf(const char *fmt, ...){
+    va_list args;
+    int i;
+
+    va_start(args, fmt);
+    write(1, printbuf, i=vsprintf(printbuf, fmt, args));
+    va_end(args);
+    return i;
+}
+
+static char * argv_rc[] = {"bin/sh", NULL};
+static char * envp_rc[] = {"HOME/", NULL};
+
+static char * argv[] = {"-/bin/sh", NULL};
+static char * envp[] = {"HOME=/usr/root", NULL};
+
+void init(void){
+    int pid, i;
+
+    setup((void *) &drive_info);
+    (void) open("/dev/tty0", O_RDWR, 0);
+    (void) dup(0);
+    (void) dup(0);
+    printf("%d buffers = %d bytes buffer space\n\r", NR_BUFFERS,
+            NR_BUFFERS * BLOCK_SIZE);
+    printf("Free mem: %d bytes\n\r", memory_end - main_memory_start);
+    if(!(pid = fork())){
+        close(0);
+        if(open("/etc/rc", O_RDONLY, 0)){
+            _exit(1);
+        }
+        execve("/bin/sh", argv_rc, envp_rc);
+        _exit(2);
+    }
+    if(pid > 0){
+        while(pid != wait(&i));
+    }
+    while(1){
+        if((pid = fork()) < 0){
+            printf("Fork failed in init\r\n");
+            continue;
+        }
+        if(!pid){
+            close(0);
+            close(1);
+            close(2);
+            (void) open("/dev/tty0", O_RDWR, 0);
+            (void) dup(0);
+            (void) dup(0);
+            _exit(execve("/bin/sh", argv, envp));
+        }
+        while(1){
+            if(pid == wait(&i)){
+                break;
+            }
+        }
+        printf("\n\rchild %d died with code %04x\n\r");
+        sync();
+    }
+    _exit(0);
 }

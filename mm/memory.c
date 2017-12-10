@@ -68,6 +68,85 @@ void free_page(unsigned long addr){
     panic("tyring to free free page");
 }
 
+int free_page_tables(unsigned long from, unsigned long size){
+    unsigned long *pg_table;
+    unsigned long *dir, nr;
+
+    if(from & 0x3fffff){
+        panic("free_page_tables called with wrong alignment");
+    }
+    if(!from){
+        panic("Trying to free up swapper memory space");
+    }
+    size = (size + 0x3fffff) >> 22;
+    dir = (unsigned long *) ((from>>20) & 0xffc);
+    for( ; size-->0; dir++){
+        if(!(1 & *dir)){
+            continue;
+        }
+        pg_table = (unsigned long *) (0xfffff000 & *dir);
+        for(nr = 0; nr < 1024; nr++){
+            if(1 & *pg_table){
+                free_page(0xfffff000 & *pg_table);
+            }
+            *pg_table = 0;
+            pg_table++;
+        }
+        free_page(0xfffff000 & *dir);
+        *dir = 0;
+    }
+    invalidate();
+    return 0;
+}
+
+int copy_page_tables(unsigned long from, unsigned long to, long size){
+    unsigned long * from_page_table;
+    unsigned long * to_page_table;
+    unsigned long this_page;
+    unsigned long * from_dir, * to_dir;
+    unsigned long  nr;
+
+    if((from&0x3fffff) || (to&0x3fffff)){
+        panic("copy_page_tables called with wwrong alignment");
+    }
+    from_dir = (unsigned long *) ((from >> 20) & 0xffc);
+    to_dir = (unsigned long *) ((to >> 20) & 0xffc);
+    size = ((unsigned) (size + 0x3fffff)) >> 22;
+
+    for( ; size-->0; from_dir++, to_dir++){
+        if(1 & *to_dir){
+            panic("copy_page_tables: already exist");
+        }
+        if(!(1 & *from_dir)){
+            continue;
+        }
+        from_page_table = (unsigned long *) (0xfffff000 & *from_dir);
+        if(!(to_page_table = (unsigned long *) get_free_page())){
+            return -1;
+        }
+        *to_dir = ((unsigned long) to_page_table) | 7;
+        nr = (from == 0)?0xA0:1024;
+        for( ; nr-- > 0; from_page_table++, to_page_table++){
+            this_page = *from_page_table;
+            if(!(1 & this_page)){
+                continue;
+            }
+            this_page &= ~2;
+            *to_page_table = this_page;
+            if(this_page > LOW_MEM){
+                *from_page_table = this_page;
+                this_page -= LOW_MEM;
+                this_page >>= 12;
+                mem_map[this_page]++;
+            }
+        }
+    }
+    invalidate();
+    return 0;
+}
+
+
+
 unsigned long put_page(unsigned long page, unsigned long address){
     unsigned long tmp, *page_table;
 

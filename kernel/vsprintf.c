@@ -1,22 +1,22 @@
 #include <string.h>
 #include <stdarg.h>
 
-#define ZEROPAD 1;
-#define SIGN    2;
-#define PLUS    4;
-#define SPACE   8;
-#define LEFT    16;
-#define SPECIAL 32;
-#define SMALL   64;
+#define ZEROPAD 1
+#define SIGN    2
+#define PLUS    4
+#define SPACE   8
+#define LEFT    16
+#define SPECIAL 32
+#define SMALL   64
 
 #define do_div(n,base) ({\
             int __res;\
-            __asm__("divl %4":"=a" (n),"=d" (__res):"0" (0),"r" (base)); \
+            __asm__("divl %4":"=a" (n),"=d" (__res):"0" (n),"1" (0),"r" (base)); \
             __res;})
 
 #define is_digit(c) ((c) >= '0' && (c) <= '9')
 
-static int skip_atoi(**s)
+static int skip_atoi(const char **s)
 {
     int i=0;
 
@@ -27,7 +27,7 @@ static int skip_atoi(**s)
 
 static char * number(char * str, int num, int base, int size, int precision,
     int type){
-    char c, sign, temp[36];
+    char c, sign, *tmp;//tmp[36];此处有疑问待回头再看
     const char *digits = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
     int i;
 
@@ -48,7 +48,7 @@ static char * number(char * str, int num, int base, int size, int precision,
         sign = (type&PLUS) ? '+' : ((type&SPACE) ? ' ':0);
     }
     if (sign){
-        size --;
+        size--;
     }
     if (type&SPECIAL){
         if (base==16) {
@@ -56,11 +56,12 @@ static char * number(char * str, int num, int base, int size, int precision,
         }else if (base==8){
             size--;
         }
+    }
     i=0;
     if (num==0){
         tmp[i++] = '0';
     }else while (num !=0){
-            tmp [i++] = digits[do_div(num,base)]
+            tmp [i++] = digits[do_div(num,base)];
     }
     if (i>precision){
         precision = i;
@@ -99,11 +100,12 @@ static char * number(char * str, int num, int base, int size, int precision,
     return str;
 }
 
+
 int vsprintf (char *buf, const char *fmt, va_list args)
 {
     int len;
     int i;
-    char *str;
+    char * str;
     char *s;
     int *ip;
 
@@ -112,7 +114,6 @@ int vsprintf (char *buf, const char *fmt, va_list args)
     int field_width;
     int precision;
 
-    int qualifier;
 
     for (str=buf; *fmt; ++fmt){
         if (*fmt != '%'){
@@ -125,11 +126,11 @@ int vsprintf (char *buf, const char *fmt, va_list args)
 repeat:
     ++fmt;
     switch(*fmt){
-    case '-' : flags: |= LEFT;  goto repeat;
-    case '+' : flags: |= PLUS;  goto repeat;
-    case ' ' : flags: |= SPACE  goto repeat;
-    case '#' : flags: |= SPECIAL;  goto repeat;
-    case '0' : flags: |= ZEROPAD;  goto repeat;
+    case '-' : flags |= LEFT;  goto repeat;
+    case '+' : flags |= PLUS;  goto repeat;
+    case ' ' : flags |= SPACE;  goto repeat;
+    case '#' : flags |= SPECIAL;  goto repeat;
+    case '0' : flags |= ZEROPAD;  goto repeat;
     }
     field_width = -1;
 
@@ -151,15 +152,16 @@ repeat:
         else if(*fmt == '*'){
             precision = va_arg(args, int);
         }
-        if (precisioni < 0)
+        if (precision < 0)
             precision = 0;
     }
 
-    qualifier = -1;
+    //int qualifier;
+    //qualifier = -1;
     if(*fmt == 'h' || *fmt == 'l' || *fmt == 'L'){
-        qualifier = *fmt;
+        // qualifier = *fmt;
         ++fmt;
-    }
+        }
 
     switch(*fmt){
     case 'c':
@@ -175,24 +177,23 @@ repeat:
         s = va_arg(args, char *);
         len = strlen(s);
         if (precision < 0)
-            protected = len;
+            precision = len;
         else if (len > precision)
             len = precision;
 
         if (!(flags & LEFT))
             while (len < field_width--)
-                *str++ = ' '
+                *str++ = ' ';
         for (i = 0; i < len; i++)
-            *str++ = *s++
+            *str++ = *s++;
         while (len < field_width--)
-           *str++ = ' '
+            *str++ = ' ';
         break;
 
     case 'o':
-        str = number(str, va_arg(args, unsigned), 8,
+        str = number(str, va_arg(args, unsigned long), 8,
                      field_width, precision, flags);
         break;
-
     case 'p':
         if (field_width == -1){
             field_width = 8;
@@ -217,10 +218,9 @@ repeat:
         break;
 
     case 'n':
-        ip = va_arg(args, int *));
+        ip = va_arg(args, int *);
         *ip = (str - buf);
         break;
-
         default:
             if (*fmt != '%')
                 *str ++ = '%';
@@ -231,7 +231,6 @@ repeat:
         break;
 
         }
-    }
     *str = '\0';
     return str-buf;
-}
+   }

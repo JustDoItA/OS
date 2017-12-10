@@ -17,6 +17,9 @@
 #include <linux/fs.h>
 #include <linux/mm.h>
 
+extern int copy_page_tables(unsigned long from, unsigned long to, long size);
+extern int free_page_tables(unsigned long form, unsigned long size);
+
 extern void trap_init(void);
 extern void panic(const char * str);
 
@@ -83,10 +86,23 @@ extern void wake_up(struct task_struct ** p);
             "d" (_TSS(n)),"c" ((long) task[n])); \
 }
 
+#define _set_base(addr, base) \
+    __asm__("movw %%dx,%0\n\t" \
+        "rorl $16,%%edx\n\t" \
+        "movb %%dl,%1\n\t" \
+        "movb %%dh,%2" \
+            ::"m" (*((addr)+2)), \
+            "m" (*((addr)+4)), \
+            "m" (*((addr)+7)), \
+            "d" (base) \
+        )//:"dx")
+
 extern long volatile jiffies;
 extern long startup_time;
 
 #define CURRENT_TIME (startup_time+jiffies/HZ)
+
+typedef int (*fn_ptr)();
 
 struct i387_struct {
     long cwd;
@@ -173,7 +189,7 @@ struct task_struct {
     // 执行时关闭文件局部位图标志(include/fcntl.h)
     unsigned long close_on_exec;
     // 进程使用的文件表结构
-    struct file * file[NR_OPEN];
+    struct file * filp[NR_OPEN];
 
     // 本任务的局部表描述符 0:空 1：代码段cs  2：数据和堆栈段ds:ss
     struct desc_struct ldt[3];
@@ -183,6 +199,8 @@ struct task_struct {
 };
 
     extern void sleep_on(struct task_struct **p);
+
+#define set_base(ldt,base) _set_base(((char *)&(ldt)), base)
 
 #define _get_base(addr)({                       \
             unsigned long __base;               \

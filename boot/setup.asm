@@ -143,20 +143,23 @@ end_move:
         jnz   empty_8042
         ret
     gdt:
-             dw 0,0,0,0
-             dw 0x07ff
-             dw 0x0000
-             dw 0x9a00
-             dw 0x00c0
-
+             dw 0,0,0,0 ;NULL空描述符
+             ;系统代码段,偏移量为0x80
+             dw 0x07ff  ;段界限0x07ff=2047
+                        ;0~2047共计2048*(4K*1024)=8M
+             dw 0x0000  ;段基址
+             dw 0x9a00  ;段属性 读/执行
+             dw 0x00c0  ;
+            ;系统的数据段
              dw 0x07ff
              dw 0x0000
              dw 0x9200
              dw 0x00c0
     idt_48   dw 0
              dw 0,0
-    gdt_48   dw 0x800
-             dw 512+gdt,0x9
+    gdt_48   dw 0x800           ;描述符表的长度 256(实体)*8(字节)=2048=0x800
+             dw 512+gdt,0x9     ;gdt的线性地址512(引导扇区的长度)
+             ; +gdt(gdt的线性地址),0x9(加载boot时将该部分程序移动至0x90000后)
     INITSEG  equ 0x9000
     SYSSEG   equ 0x1000
     SETUPSEG equ 0x9020
