@@ -12,7 +12,7 @@
  * the page directory.
  */
 .text
-.globl idt,_gdt,pg_dir,_tmp_floppy_area
+.globl idt,gdt,pg_dir,_tmp_floppy_area
 pg_dir:
 startup_32:
 	movl $0x10,%eax
@@ -228,12 +228,12 @@ idt_descr:
 .word 0
 gdt_descr:
 	.word 256*8-1		# so does gdt (not that that's any
-	.long _gdt		# magic number, but it works for me :^)
+	.long gdt		# magic number, but it works for me :^)
 
 	.align 8
 idt:	.fill 256,8,0		# idt is uninitialized
 
-_gdt:	.quad 0x0000000000000000	/* NULL descriptor */
+gdt:	.quad 0x0000000000000000	/* NULL descriptor */
 	.quad 0x00c09a0000000fff	/* 16Mb */
 	.quad 0x00c0920000000fff	/* 16Mb */
 	.quad 0x0000000000000000	/* TEMPORARY - don't use */

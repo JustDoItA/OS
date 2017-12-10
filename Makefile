@@ -20,7 +20,7 @@ CPP =cpp -nostdine -Iinclude
 
 ROOT_DEV=/dev/hd6
 ARCHIVES=kernel/kernel.o fs/fs.o  mm/mm.o kernel/math/math.a
-DRIVERS=kernel/blk_drv/blk_drv.a #kernel/chr_drv.a
+DRIVERS=kernel/blk_drv/blk_drv.a kernel/chr_drv/chr_drv.a
 MATH = kernel/math/math.a
 LIBS = lib/lib.a
 
@@ -46,8 +46,10 @@ clean:
 	(cd kernel; make clean)
 	(cd kernel/math; make clean)
 	(cd kernel/blk_drv; make clean)
+	(cd kernel/chr_drv; make clean)
 	(cd fs; make clean)
 	(cd mm; make clean)
+	(cd lib; make clean)
 
 boot/bootsect: boot/boot.asm
 	$(NASM) -o boot/bootsect boot/boot.asm
@@ -58,8 +60,10 @@ tools/system: boot/head.o init/main.o
 	(cd kernel; make)
 	(cd kernel/math; make)
 	(cd kernel/blk_drv; make)
+	(cd kernel/chr_drv; make)
 	(cd fs; make)
 	(cd mm; make)
-	$(LD) $(LDFLAGS) boot/head.o init/main.o $(ARCHIVES) $(DRIVERS) -o tools/sys > System.map
+	(cd lib; make)
+	$(LD) $(LDFLAGS) boot/head.o init/main.o $(ARCHIVES) $(DRIVERS) $(LIBS) -o tools/sys > System.map
 	objcopy -O binary -S tools/sys tools/system
-init/main.o : init/main.c include/time.h include/linux/sched.h include/linux/head.h
+init/main.o : init/main.c include/time.h include/linux/sched.h include/linux/head.h include/linux/tty.h
