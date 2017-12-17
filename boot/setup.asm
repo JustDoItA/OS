@@ -164,5 +164,5 @@ end_move:
     SYSSEG   equ 0x1000
     SETUPSEG equ 0x9020
 
-times 2046-($-$$) db 'a'
+times 2046-($-$$) db '0'
 dw 0xaa55

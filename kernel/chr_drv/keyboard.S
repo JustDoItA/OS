@@ -1,23 +1,8 @@
-# 1 "keyboard.S"
-# 1 "<built-in>"
-# 1 "<command-line>"
-# 1 "keyboard.S"
-
-
-
-
-
-# 1 "../../include/linux/config.h" 1
-
-
-
-
-
-
-
-
-
-# 6 "keyboard.S" 2
+/*
+  @lpf
+  Sat Nov 11 06:45:12 PST 2017
+*/
+#include <linux/config.h>
 
 .text
 .globl keyboard_interrupt
@@ -190,13 +175,13 @@ ok_cur:
     xorl %ebx, %ebx
     jmp put_queue
 
-
-
-
-
+#if defined(KBD_FR)
+num_table:
+    .ascii "789 456 1230."
+#else
 num_table:
     .ascii "789 456 1230,"
-
+#endif
 cur_table:
     .ascii "HA5 DGC YB623"
 
@@ -230,7 +215,7 @@ func_table:
     .long 0x455b5b1b,0x465b5b1b,0x475b5b1b,0x485b5b1b
     .long 0x495b5b1b,0x4a5b5b1b,0x4b5b5b1b,0x4c5b5b1b
 
-
+#if defined(KBD_FINNISH)
 key_map:
     .byte 0,27
     .ascii "1234567890+"
@@ -279,7 +264,104 @@ alt_map:
     .byte '|
     .fill 10,1,0
 
-# 365 "keyboard.S"
+#elif defined(KBD_GR)
+
+key_map:
+    .byte 0,27
+    .ascii "1234567890\\'"
+    .byte 127,9
+    .ascii "qwertzuiop@+"
+    .byte 13,0
+    .ascii "yxcvbnm,.-"
+    .fill 16,1,0
+    .byte '-,0,0,0,'+
+    .byte 0,0,0,0,0,0,0
+    .byte '<
+    .fill 10,1,0
+
+shift_map:
+    .byte 0,27
+    .ascii "!\"#$%&/()=?`"
+    .byte 127,9
+    .ascii "QWERtZUIOP\\*"
+    .byte 13,0
+    .ascii "ASDFGHJKL{}~"
+    .byte 0,''
+    .ascii "YXCVBNM;:_"
+    .byte 0,'*,0,32
+    .fill 16,1,0
+    .byte '-,0,0,0,'+
+    .byte 0,0,0,0,0,0,0
+    .byte '>
+    .fill 10,1,0
+
+alt_map:
+    .byte 0,0
+    .ascii "\0@\0$\0\0{[]}\\\0"
+    .byte 0,0
+    .byte '@,0,0,0,0,0,0,0,0,0,0
+    .byte '~,13,0
+    .byte 0,0,0,0,0,0,0,0,0,0,0
+    .byte 0,0
+    .byte 0,0,0,0,0,0,0,0,0,0,0
+    .byte 0,0,0,0
+    .fill 16,1,0
+    .byte 0,0,0,0,0
+    .byte 0,0,0,0,0,0,0
+    .byte '|
+    .fill 10,1,0
+
+#elif defined(KBD_FR)
+
+key_map:
+    .byte 0,27
+    .ascii "&{\"'(-}_/@)=)"
+    .byte 127,9
+    .ascii "azertyuiop^$"
+    .byte '`,0,42
+    .ascii "wxcvbn,;:!"
+    .byte 0,'*,0,32
+    .fill 16,1,0
+    .byte '-,0,0,0,'+
+    .byte 0,0,0,0,0,0,0
+    .byte '<
+    .fill 10,1,0
+
+shift_map:
+    .byte 0,27
+    .ascii "1234567890]+"
+    .byte 127,9
+    .ascii "AZERTYUIOP<>"
+    .byte 13,0
+    .ascii "QSDFGHJKLM%"
+    .byte '~,0,'#
+    .ascii "WXCVBN?./\\"
+    .byte 0,'*,0,32
+    .fill 16,1,0
+    .byte '-,0,0,0,'+
+    .byte 0,0,0,0,0,0,0
+    .byte '>
+    .fill 10,1,0
+
+alt_map:
+    .byte 0,0
+    .ascii "\0~#{[|`\\^@]}"
+    .byte 0,0
+    .byte '@,0,0,0,0,0,0,0,0,0,0
+    .byte '~,13,0
+    .byte 0,0,0,0,0,0,0,0,0,0,0
+    .byte 0,0
+    .byte 0,0,0,0,0,0,0,0,0,0,0
+    .byte 0,0,0,0
+    .fill 16,1,0
+    .byte 0,0,0,0,0
+    .byte 0,0,0,0,0,0,0
+    .byte '|
+    .fill 10,1,0
+
+#else
+#error "KBD-type not defined"
+#endif
 
 
 do_self:

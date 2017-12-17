@@ -512,7 +512,7 @@ void con_init(void){
         video_mem_start = 0xb0000;  //设置单显影像内存起始地址
         video_port_reg = 0x3b4;    //设置单显索引寄存器端口
         video_port_val = 0x3b5;    //设置单显数据寄存器端口
-        if((ORIG_VIDEO_EGA_BX) != 0x10){
+        if((ORIG_VIDEO_EGA_BX & 0xff) != 0x10){
             video_type = VIDEO_TYPE_EGAM; //设置显示类型EGA单色 (33 '!')
             video_mem_end = 0xb8000;      //设置显示内存末端地址
             display_desc = "EGAm";       //设置显示描述字符串
@@ -522,7 +522,7 @@ void con_init(void){
             display_desc = "*MDA";
         }
     }else{
-        video_mem_start = 0xbc000;
+        video_mem_start = 0xb8000;
         video_port_reg = 0x3d4;
         video_port_val = 0x3d5;
         if((ORIG_VIDEO_EGA_BX & 0xff) != 0x10){

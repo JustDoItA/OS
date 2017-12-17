@@ -105,9 +105,6 @@ int main(void){
         pause();
     }
 
-    //struct test T1;
-    //T1.b = 8;
-    //printf("Hello %d World!\n",T1.b);
     return 0;
 }
 

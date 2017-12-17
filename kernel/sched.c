@@ -7,6 +7,26 @@
 #define _S(nr) (1<<((nr)-1))
 #define _BLOCKABLE (~(_S(SIGKILL)) | _S(SIGSTOP))
 
+void show_task(int nr, struct task_struct * p){
+    int i,j = 4096-sizeof(struct task_struct);
+
+    printk("%d: pid=%d, state=%d ", nr, p->pid,p->state);
+    i = 0;
+    while(i<j && !((char *)(p+1))[i]){
+        i++;
+    }
+    printk("%d (of %d) chars free in kernel stack \n\t",i,j);
+}
+
+void show_stat(void){
+    int i;
+    for(i = 0;i < NR_TASKS; i++){
+        if(task[i]){
+            show_task(i,task[i]);
+        }
+    }
+}
+
 extern void schedule(void);
 
 long startup_time = 0;
