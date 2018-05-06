@@ -20,7 +20,7 @@ chr_drv.a: $(OBJS)
 	$(AR) chr_drv.a $(OBJS)
 	sync
 clean:
-	rm -f core *.o *.a
+	rm -f core *.o *.a keyboard.s
 keyboard.s : keyboard.S ../../include/linux/config.h
 	$(CPP) -traditional keyboard.S -o keyboard.s
 tty_io.s tty_io.o : tty_io.c ../../include/linux/tty.h
