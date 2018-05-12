@@ -7,15 +7,40 @@
 .text
 .globl keyboard_interrupt
 
+//size 键盘缓冲区的长度
 size = 1024
 
-head = 4
-tail = 8
-proc_list = 12
-buf = 16
+//以下这些是缓冲队列结构中的偏移量
+head = 4 /*缓冲区中头指针字段偏移*/
+tail = 8 /*缓冲区中尾指针字段偏移*/
+proc_list = 12 /*等待该缓冲队列的进程字段偏移*/
+buf = 16        /*缓冲区字段偏移*/
 
+//mode 是键盘特殊键按下状态标志
+// 表示大小写转换键caps，交换键alt，控制键ctrl和换挡键shift
+// 位7 caps键按下
+// 位6 caps键状态（应该与leds中对应标志位一样）
+// 位5 右alt键按下
+// 位4 左alt键按下
+// 位3 右ctrl键按下
+// 位2 左ctrl键按下
+// 位1 右shift键按下
+// 位0 左shift键按下
 mode: .byte 0
+
+// 数字锁定键num-lock，大小写转换键caps-lock和滚动锁定键
+//scroll-lock的LED发光管状态
+//位7-3全0不用
+//位2 caps-lock
+//位1 num-lock 初始置1，即设置数字锁定键num-lock发光管位亮
+//位0 scroll-lock
 leds: .byte 2
+
+//当扫描码是0xe0 或 0xe1时，置该标志。表示其后还跟随者1个或
+//两个字符扫描码
+//位1=1 收到0xe1标志
+//位0=1 收到0xe0标志
+
 e0:  .byte 0
 
 keyboard_interrupt:
@@ -25,19 +50,23 @@ keyboard_interrupt:
     pushl %edx
     push  %ds
     push  %es
-    movl $0x10, %eax
+    movl $0x10, %eax  /*将ds，es段寄存器置位内核数据段*/
     mov %ax, %ds
     mov %ax, %es
     xor %al, %al
-    inb $0x60, %al
-    cmpb $0xe0, %al
+    inb $0x60, %al    /*读取扫描码到al寄存器*/
+    cmpb $0xe0, %al     /*如果扫描码是0xe0*/
     je set_e0
     cmpb $0xe0, %al
     je set_e1
-    call *key_table(,%eax,4)
-    movb $0, e0
+    call *key_table(,%eax,4) /*调用键盘处理程序key_table + eax *4*/
+    movb $0, e0             /*复位e0标志位*/
 
-e0_e1:   inb $0x61, %al
+//下面代码是针对8255A的PC标准键盘电路进行硬件复位处理，端口0x61
+//是8259A输出口B的地址，该输出端口的第7位用于禁止和允许对键盘数据的处理
+//这段程序用于对收到的扫描码做出应答。方法是首先禁止键盘，然后立即重新允许
+//键盘中断
+e0_e1:   inb $0x61, %al  /*取PPI端口B状态，其位7用于允许/禁止（0/1）键盘*/
     jmp 1f
 1:  jmp 1f
 1:  orb $0x80, %al
@@ -398,6 +427,10 @@ minus:  cmpb $1,e0
     jne do_self
     movl $'/,%eax
     jmp put_queue
+
+//下面是一张子程序地址跳转表，当取得扫描码后就根据此表调用
+//相应的扫描码处理子程序。大多数调用的子程序是do_self,或者是none
+//这起决于是按键make还是释放键break
 
 key_table:
     .long none,do_self,do_self,do_self

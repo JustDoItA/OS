@@ -17,12 +17,25 @@ struct termios {
 };
 
 /* c_cc characters */
+#define VINTR  0
+#define VQUIT  1
 #define VERASE 2
+#define VKILL  3
+#define VEOF   4
+
+
+
+
+#define VSTART  8
+#define VSTOP   9
 
 
 /*c_iflag bits */
 
+#define INLCR 0000100
+#define IGNCR 0000200
 #define ICRNL 0000400
+#define IUCLC 0001000
 
 
 /*c_oflag bits */

@@ -9,8 +9,8 @@
 #include <asm/system.h>
 
 
-#define ORIG_X (*(unsigned char *)0x90000)
-#define ORIG_Y (*(unsigned char *)0x90001)
+#define ORIG_X (*(unsigned char *)0x90000)//17
+#define ORIG_Y (*(unsigned char *)0x90001)//0
 
 #define ORIG_VIDEO_PAGE (*(unsigned short *)0x90004)
 #define ORIG_VIDEO_MODE ((*(unsigned short *)0x90006) & 0xff)
@@ -28,6 +28,7 @@
 #define NPAR 16
 
 extern void keyboard_interrupt(void);
+extern void int3(void);
 
 static unsigned char video_type;
 static unsigned long video_num_columns;
@@ -62,12 +63,14 @@ void sysbeep(void){
     //beepcount = HZ/8;
 }
 
+//设置光标在显示存中的位置
 static inline void gotoxy(unsigned int new_x, unsigned new_y){
     if(new_x > video_num_columns || new_y >= video_num_lines){
         return;
     }
     x = new_x;
     y = new_y;
+    //显存起始位置加行数×每行占内存大小+列数×2
     pos = origin + y*video_size_row + (x<<1);
 }
 
@@ -499,13 +502,22 @@ void con_write(struct tty_struct *tty){
 void con_init(void){
     register unsigned char a;
     char *display_desc = "????";
+    //清屏使用
+    char *init_desc ;
     char *display_ptr;
+    int k;
+
+//debug
+    int X = ORIG_X;
+    int Y = ORIG_Y;
 
     video_num_columns = ORIG_VIDEO_COLS; //显示器显示字符列数(80)
     video_size_row = video_num_columns * 2; //每行需要使用的字节数(160)
     video_num_lines = ORIG_VIDEO_LINES; //显示器显示字符行数(25)
     video_page = ORIG_VIDEO_PAGE; //当前显示页面 (0)
     video_erase_char = 0x0720; //擦除字符（0x20显示字符，0x07属性）
+
+
 
     //ORIG_VIDEO_MODE = 7 单色显示器
     if(ORIG_VIDEO_MODE == 7){
@@ -534,6 +546,13 @@ void con_init(void){
             video_mem_end = 0xba000;
             display_desc = "*CGA";
         }
+    }
+
+    init_desc = " ";
+    display_ptr = ((char *)video_mem_start);
+    for(k = 0; k < ORIG_VIDEO_LINES * video_num_columns; k++){
+        *display_ptr++ = *init_desc; //复制字符
+        display_ptr++;  //空开属性字节位置
     }
 
     //在屏幕右上角显示描述字符串，采用的方法是直接将字符串写到显示内存的相应位置处

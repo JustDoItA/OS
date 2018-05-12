@@ -14,7 +14,8 @@ CPP = gcc -E -nostdinc -I../include
 	$(AS) -o $*.o $<
 .c.o:
 	$(CC) $(CFLAGS) -c -o $*.o $<
-OBJS = errno.o setsid.o open.o dup.o close.o _exit.o execve.o wait.o write.o
+OBJS = errno.o setsid.o open.o dup.o close.o _exit.o execve.o wait.o write.o \
+	   ctype.o
 
 lib.a : $(OBJS)
 	$(AR) lib.a $(OBJS)
@@ -27,6 +28,7 @@ open.s open.o : open.c ../include/unistd.h ../include/stdarg.h
 dup.s dup.o : dup.c ../include/unistd.h
 write.s write.o : write.c ../include/unistd.h
 close.s close.o : close.c ../include/unistd.h
+ctype.s ctype.o : ctype.c ../include/ctype.h
 _exit.s _exit.o : _exit.c ../include/unistd.h
 execve.s execve.o : execve.c ../include/unistd.h
 wait.s wait.o : wait.c ../include/unistd.h

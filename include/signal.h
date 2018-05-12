@@ -1,6 +1,10 @@
 #ifndef _SIGNAL_H
 #define _SIGNAL_H
 
+
+#define SIGINT  2
+#define SIGQUIT 3
+
 #define SIGFPE 8
 #define SIGKILL 9
 #define SIGSEGV 11
