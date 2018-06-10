@@ -1,6 +1,5 @@
 #include "asm/io.h"
-#include <time.h>
-
+#include <time.h> 
 #define __LIBRARY__
 #include <unistd.h>
 
@@ -10,6 +9,9 @@ static inline _syscall0(int, fork)
 static inline _syscall0(int, pause)
 static inline _syscall1(int, setup, void *, BIOS)
 static inline _syscall0(int, sync)
+//myself
+static inline _syscall0(int, setsid)
+
 
 #include <linux/tty.h>
 #include <linux/sched.h>
@@ -24,7 +26,11 @@ static char printbuf[1024];
 
 extern int vsprintf();
 extern void init(void);
+extern void blk_dev_init(void);
+extern void chr_dev_init(void);
+extern void hd_init(void);
 extern void mem_init(long start, long end);
+extern void floppy_init(void);
 extern long rd_init(long mem_start, int length);
 extern long kernel_mktime(struct tm *tm);
 extern long startup_time;
@@ -68,6 +74,11 @@ static long buffer_memory_end = 0;
 static long main_memory_start = 0;
 struct drive_info {char dummy[32];} drive_info;
 
+int set_trap(){
+    //__asm__("int3");
+    return 0;
+}
+
 int main(void){
     ROOT_DEV = ORIG_ROOT_DEV;
     drive_info = DRIVE_INFO;
@@ -88,18 +99,25 @@ int main(void){
 #endif
     mem_init(main_memory_start,memory_end);
     trap_init();
+    blk_dev_init();
+    chr_dev_init();
     tty_init();
     time_init();
-
-
-
+    sched_init();
+    buffer_init(buffer_memory_end);
+    hd_init();
+    floppy_init();
     sti();
     move_to_user_mode();
+
+//调试
+//set_trap();
+//for(;;){;}
+//init();
 
     if(!fork()){
         init();
     }
-
 
     for(;;){
         pause();
@@ -108,18 +126,8 @@ int main(void){
     return 0;
 }
 
-static int printf(const char *fmt, ...){
-    va_list args;
-    int i;
-
-    va_start(args, fmt);
-    write(1, printbuf, i=vsprintf(printbuf, fmt, args));
-    va_end(args);
-    return i;
-}
-
-static char * argv_rc[] = {"bin/sh", NULL};
-static char * envp_rc[] = {"HOME/", NULL};
+static char * argv_rc[] = {"/bin/sh", NULL};
+static char * envp_rc[] = {"/HOME=/", NULL};
 
 static char * argv[] = {"-/bin/sh", NULL};
 static char * envp[] = {"HOME=/usr/root", NULL};
@@ -128,32 +136,35 @@ void init(void){
     int pid, i;
 
     setup((void *) &drive_info);
-    (void) open("/dev/tty0", O_RDWR, 0);
+    (void) open("/dev/tty0",O_RDWR, 0);
     (void) dup(0);
     (void) dup(0);
-    printf("%d buffers = %d bytes buffer space\n\r", NR_BUFFERS,
-            NR_BUFFERS * BLOCK_SIZE);
-    printf("Free mem: %d bytes\n\r", memory_end - main_memory_start);
+    //pintf("%d buffers = %d bytes buffer space\n\r", NR_BUFFERS,
+    //NR_BUFFERS, NR_BUFFERS*BLOCK_SIZE);
+    //printf("Free mem %d bytes\n\r",memory_end-main_memory_start);
     if(!(pid = fork())){
         close(0);
-        if(open("/etc/rc", O_RDONLY, 0)){
+        if(open("/etc/rc",O_RDONLY,0)){
             _exit(1);
         }
         execve("/bin/sh", argv_rc, envp_rc);
         _exit(2);
     }
-    if(pid > 0){
-        while(pid != wait(&i));
+    if(pid>0){
+        while(pid != wait(&i)){
+
+        }
     }
     while(1){
-        if((pid = fork()) < 0){
-            printf("Fork failed in init\r\n");
+        if((pid=fork())<0){
+            //printf("Fork failed in init\r\n");
             continue;
         }
         if(!pid){
             close(0);
             close(1);
             close(2);
+            setsid();
             (void) open("/dev/tty0", O_RDWR, 0);
             (void) dup(0);
             (void) dup(0);
@@ -162,10 +173,10 @@ void init(void){
         while(1){
             if(pid == wait(&i)){
                 break;
-            }
+           }
+            //printf("\n\rchild %d died with code %04x\n\r, pid, i");
+            sync();
         }
-        printf("\n\rchild %d died with code %04x\n\r");
-        sync();
     }
     _exit(0);
 }

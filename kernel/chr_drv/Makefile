@@ -25,7 +25,7 @@ keyboard.s : keyboard.S ../../include/linux/config.h
 	$(CPP) -traditional keyboard.S -o keyboard.s
 tty_io.s tty_io.o : tty_io.c ../../include/linux/tty.h \
 	../../include/termios.h ../../include/linux/sched.h \
-	../../include/ctype.h
+	../../include/ctype.h ../../include/asm/system.h
 console.s console.o : console.c ../../include/linux/tty.h \
 	../../include/asm/io.h ../../include/asm/system.h \
 	../../include/linux/sched.h

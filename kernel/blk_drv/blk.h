@@ -51,17 +51,27 @@ extern struct task_struct *wait_for_request;
 #define DEVICE_NR(device) ((device) & 3)
 #define DEVICE_ON(device) floppy_on(DEVICE_NR(device))
 #define DEVICE_OFF(device) floppy_off(DEVICE_NR(device))
+
+#elif (MAJOR_NR ==3)
+//
+#define DEVICE_NAME "harddisk"
+#define DEVICE_INTR do_hd
+#define DEVICE_REQUEST do_hd_request
+#define DEVICE_NR(device) (MINOR(device)/5)
+#define DEVICE_ON(device)
+#define DEVICE_OFF(device)
+//#elif
 #else
 #error "unknown blk device"
-
 #endif
 
 #define CURRENT (blk_dev[MAJOR_NR].current_request)
+#define CURRENT_DEV (DEVICE_NR(CURRENT->dev))
 
 extern inline void unlock_buffer(struct buffer_head *bh)
 {
     if (!bh->b_lock)
-        printk(DEVICE_NAME": free buffer being unloceed\n");
+        //printk(DEVICE_NAME": free buffer being unloceed\n");
     bh->b_lock=0;
     wake_up(&bh->b_wait);
 }
@@ -74,9 +84,9 @@ extern inline void end_request(int uptodate)
         unlock_buffer(CURRENT->bh);
     }
     if (!uptodate){
-        printk(DEVICE_NAME "I/O error \n\r");
-        printk("dev %04x, block %d\n\r",CURRENT->dev,
-               CURRENT->bh->b_blocknr);
+        //  printk(DEVICE_NAME "I/O error \n\r");
+        //printk("dev %04x, block %d\n\r",CURRENT->dev,
+        //     CURRENT->bh->b_blocknr);
     }
     wake_up(&CURRENT->waiting);
     wake_up(&wait_for_request);

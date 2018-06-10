@@ -43,6 +43,41 @@ int sync_dev(int dev){
     return 0;
 }
 
+void inline invalidate_buffers(int dev){
+    int i;
+    struct buffer_head *bh;
+
+    bh = start_buffer;
+    for(i=0; i<NR_BUFFERS; i++,bh++){
+        if(bh->b_dev != dev){
+            continue;
+        }
+        wait_on_buffer(bh);
+        if(bh->b_dev == dev){
+            bh->b_uptodate = bh->b_dirt = 0;
+        }
+    }
+}
+
+void check_disk_change(int dev){
+    int i;
+
+    if(MAJOR(dev) != 2){
+        return;
+    }
+    if(!floppy_change(dev & 0x03)){
+        return;
+    }
+    for(i=0; i<NR_SUPER; i++){
+       if(super_block[i].s_dev == dev){
+          put_super(super_block[i].s_dev);
+        }
+    }
+    invalidate_inodes(dev);
+    invalidate_buffers(dev);
+
+}
+
 #define _hashfn(dev, block) (((unsigned)(dev^block))%NR_HASH)
 #define hash(dev, block) hash_table[_hashfn(dev, block)]
 
@@ -65,19 +100,20 @@ static struct buffer_head * find_buffer(int dev, int block){
     return NULL;
 }
 
-struct buffer_head * get_hash_table (int dev, int block){
+
+struct buffer_head * get_hash_table(int dev, int block){
     struct buffer_head * bh;
 
-    for(;;) {
-        if(!(bh = find_buffer(dev, block))){
+    for(;;){
+        if(!(bh=find_buffer(dev, block))){
             return NULL;
         }
-        bh -> b_count++;
+        bh->b_count++;
         wait_on_buffer(bh);
-        if(bh -> b_dev == dev && bh -> b_blocknr == block){
+        if(bh->b_dev == dev && bh->b_blocknr == block){
             return bh;
         }
-        bh -> b_count--;
+        bh->b_count--;
     }
 }
 
@@ -222,4 +258,43 @@ struct buffer_head * breada(int dev, int first, ...){
     }
     brelse(bh);
     return (NULL);
+}
+//缓冲区初始话函数
+//参数buffer_end是指指定的缓冲区内存的末端。对于系统有16MB内存
+//则缓冲区末端设置位4MB
+//对于系统有8MB内存，缓冲区末端设置位2MB
+void buffer_init(long buffer_end){
+    struct buffer_head * h = start_buffer;
+    void * b;
+    int i;
+
+    if (buffer_end == 1<<20){
+        b = (void *) (640*1024);
+     }else{
+        b = (void *) buffer_end;
+    }
+    while((b -= BLOCK_SIZE) >= ((void *)(h+1))){
+        h->b_dev = 0;
+        h->b_dirt = 0;
+        h->b_count = 0;
+        h->b_uptodate = 0;
+        h->b_wait = NULL;
+        h->b_next = NULL;
+        h->b_prev = NULL;
+        h->b_data = (char *) b;
+        h->b_prev_free = h-1;
+        h->b_next_free = h+1;
+        h++;
+        NR_BUFFERS++;
+        if(b == (void *) 0x100000){
+            b=(void *) 0xA00000;
+        }
+    }
+    h--;
+    free_list = start_buffer;
+    free_list->b_prev_free=h;
+    h->b_next_free = free_list;
+    for(i=0; i<NR_HASH; i++){
+        hash_table[i] = NULL;
+    }
 }

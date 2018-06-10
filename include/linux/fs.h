@@ -12,13 +12,28 @@
 #define READA 2
 #define WRITEA 3
 
+void buffer_init(long buffer_end);
+
+void put_super(int dev);
+//myself
+void invalidate_inodes(int dev);
+void invalidate_buffers(int dev);
 
 #define MAJOR(a) (((unsigned)(a))>>8)
 #define MINOR(a) ((a)&0xff)
 
+#define ROOT_INO 1
+
+#define I_MAP_SLOTS 8
+#define Z_MAP_SLOTS 8
+
 #define SUPER_MAGIC 0x137F
 
-#define NR_OPEN 20
+#define NR_OPEN  20
+#define NR_INODE 32
+
+#define NR_FILE 64
+#define NR_SUPER 8
 
 #define NR_BUFFERS nr_buffers
 
@@ -32,6 +47,9 @@
 #ifndef NULL
 #define NULL ((void *) 0)
 #endif
+
+
+#define INODES_PER_BLOCK ((BLOCK_SIZE)/(sizeof(struct d_inode)))
 
 extern int ROOT_DEV;
 
@@ -50,6 +68,16 @@ struct buffer_head {
     struct buffer_head * b_next;            //hash 队列上下一块
     struct buffer_head * b_prev_free;       //空闲表的前一块
     struct buffer_head * b_next_free;       //空闲表的下一块
+};
+
+struct d_inode{
+    unsigned short i_mode;
+    unsigned short i_uid;
+    unsigned long i_size;
+    unsigned long i_time;
+    unsigned long i_git;
+    unsigned char i_nlinks;
+    unsigned short i_zone[9];
 };
 
 struct m_inode{
@@ -88,6 +116,7 @@ struct super_block {
     unsigned short s_ninodes;
     unsigned short s_nzones;
     unsigned short s_imap_blocks;
+    unsigned short s_zmap_blocks;
     unsigned short s_firstdatazone;
     unsigned short s_log_zone_size;
     unsigned short s_max_size;
@@ -116,15 +145,39 @@ struct d_super_block {
     unsigned short s_magic;
 };
 
-extern int nr_buffers;
 
-extern int bmap(struct m_inode *inde, int block);
+
+extern struct file file_table[NR_INODE];
+extern struct super_block super_block[NR_SUPER];
+
+extern int nr_buffers;
+extern void check_disk_change(int dev);
+extern int floppy_change(unsigned int nr);
+extern int ticks_to_floppy_on(unsigned int nr);
+extern void floppy_on(unsigned int dev);
+extern void floppy_off(unsigned int dev);
+extern void truncate(struct m_inode *inode);
+
+extern int bmap(struct m_inode *inode, int block);
 extern void ll_rw_block(int rw, struct buffer_head * bh);
 extern void brelse(struct buffer_head *buf);
+
+extern void iput(struct m_inode * inode);
+extern struct m_inode * iget(int dev, int nr);
+
+extern struct buffer_head * get_hash_table(int dev, int block);
 
 extern struct buffer_head * bread(int dev, int block);
 extern void bread_page(unsigned long addr, int dev, int b[4]);
 extern struct buffer_head * breada(int dev, int block, ...);
 extern int new_block(int dev);
 
+extern void free_block(int dev, int block);
+
+extern void free_inode(struct m_inode *inode);
+extern int sync_dev(int dev);
+
+extern struct super_block * get_super(int dev);
+
+extern void mount_root(void);
 #endif

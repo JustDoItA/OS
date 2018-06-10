@@ -131,3 +131,13 @@ void ll_rw_block(int rw, struct buffer_head *bh){
     }
     make_request(major, rw, bh);
 }
+//块设备初始化函数，由初始化程序main.c调用
+//初始话请求数组，将所有请求项置为空闲项(dev = -1)
+//有32项（NR_REQUEST = 32）
+void blk_dev_init(void){
+    int i;
+    for (i=0 ; i<NR_REQUEST ; i++){
+        request[i].dev = -1;
+        request[i].next = NULL;
+    }
+}

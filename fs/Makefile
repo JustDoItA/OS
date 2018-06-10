@@ -3,8 +3,9 @@ AS =as
 CC =gcc
 LD =ld
 LDFLAGS =-M -x
+#-fno-builtin 解决自己实现memset函数的时候发生冲突警告
 CFLAGS = -Wall -O -g -fstrength-reduce -fomit-frame-pointer \
-	-finline-functions -nostdinc -I../include
+	-finline-functions -fno-builtin -nostdinc -I../include
 CPP = gcc -E -nostdinc -I../include
 .c.s:
 	$(CC) $(CFLAGE) -S -o $*.o $<
@@ -12,7 +13,7 @@ CPP = gcc -E -nostdinc -I../include
 	$(AS) -c -o $*.o $<
 .c.o:
 	$(CC) $(CFLAGS) -c -o $*.o $<
-OBJS = super.o buffer.o inode.o
+OBJS = super.o buffer.o inode.o truncate.o bitmap.o
 
 fs.o: $(OBJS)
 	$(LD) -r -o fs.o $(OBJS)
@@ -20,6 +21,10 @@ clean:
 	rm -f core *.o *.a
 
 buffer.o : buffer.c ../include/linux/fs.h
-super.o : super.c ../include/linux/fs.h
-inode.o : inode.c ../include/linux/fs.h ../include/linux/kernel.h \
+super.o : super.c ../include/linux/fs.h ../include/asm/system.h \
 	../include/linux/sched.h
+inode.o : inode.c ../include/linux/fs.h ../include/linux/kernel.h \
+	../include/linux/sched.h ../include/asm/system.h ../include/linux/fs.h \
+	../include/string.h ../include/sys/stat.h
+truncate.o : truncate.c ../include/sys/stat.h ../include/linux/sched.h
+bitmap.o : bitmap.c ../include/linux/fs.h ../include/string.h

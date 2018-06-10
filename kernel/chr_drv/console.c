@@ -53,7 +53,11 @@ static unsigned long npar,par[NPAR];
 static unsigned long ques = 0;
 static unsigned char attr = 0x07;
 
-//int beepcount = 0;
+void sysbeepstop(void){
+    outb(inb_p(0x61)&0xFC, 0x61);
+}
+
+int beepcount = 0;
 
 void sysbeep(void){
     outb_p(inb_p(0x61)|3, 0x61);
@@ -277,8 +281,11 @@ void csi_m(void){
 
 static inline void set_cursor(void){
     cli();
+    //首先使用索引寄存器端口选择显示控制数据控制器r14(光标当前显示位置高字节),
+    //然后写入光标当前位置高字节()。是相对于默认显示内存操作的
     outb_p(14, video_port_reg);
     outb_p(0xff&((pos - video_mem_start)>>9),video_port_val);
+    //再使用索引寄存器选择r15，并将光标当前位置低字节写入其中
     outb_p(15, video_port_reg);
     outb_p(0xff&((pos - video_mem_start)>>1), video_port_val);
     sti();
@@ -312,21 +319,34 @@ static void restore_cur(void){
     gotoxy(saved_x, saved_y);
 }
 
+//控制台写函数
+//从终端对应的tty写缓冲队列中取字符,并显示在屏幕上
 void con_write(struct tty_struct *tty){
     int nr;
     char c;
 
     nr = CHARS(tty->write_q);
     while(nr--){
+        //从写队列中取一字符c，根据前面所处理的字符状态state 分别处理
+        //satte = 0 初始状态；或者原状态是4；或原状态1，但字符不是'['
+        //1:原状态是0：并且字符是转义字符ESC(0x1b = 033 = 27)
+        //2:原状态是1：并且字符是'['
+        //3:原状态是2：或者原状态是3，并且字符是';'或数字
+        //4:原状态是3：并且字符不是';'或数字
         GETCH(tty->write_q,c);
         switch(state){
         case 0:
+            //如果字符不是控制字符（c>31）,并且不是扩展字符（c<127）
             if(c > 31 && c < 127){
+                //如果当前贯标处在行末端或末端以外，则将光标移到下行头列。并
+                //调整光标位置对应的内存指针pos
                 if(x >= video_num_columns){
                     x -= video_num_columns;
                     pos -= video_size_row;
                     lf();
                 }
+                //将字符c写到显示内存中pos处，并将光标右移1列，同时也将pos对应
+                //移动2个字节
                 __asm__("movb attr, %%ah\n\t"
                     "movw %%ax, %1\n\t"
                         ::"a" (c), "m" (*(short *)pos)

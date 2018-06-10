@@ -20,6 +20,8 @@
 extern int copy_page_tables(unsigned long from, unsigned long to, long size);
 extern int free_page_tables(unsigned long form, unsigned long size);
 
+extern void sched_init(void);
+
 extern void trap_init(void);
 extern void panic(const char * str);
 
@@ -54,6 +56,8 @@ extern long volatile jiffies;
 
 
 
+extern void interruptible_sleep_on(struct task_struct **p);
+extern void add_timer(long jiffies, void(*fn)(void));
 extern void sleep_on(struct task_struct **p);
 
 extern void wake_up(struct task_struct ** p);
@@ -63,6 +67,8 @@ extern void wake_up(struct task_struct ** p);
 #define FIRST_LDT_ENTRY (FIRST_TSS_ENTRY+1)
 #define _TSS(n) ((((unsigned long) n)<<4)+(FIRST_TSS_ENTRY<<3))
 #define _LDT(n) ((((unsigned long) n)<<4)+(FIRST_LDT_ENTRY<<3))
+#define ltr(n) __asm__("ltr %%ax" ::"a" (_TSS(n)))
+#define lldt(n) __asm__("lldt %%ax"::"a" (_LDT(n)))
 
 #define str(n) \
     __asm__("str %%ax\n\t" \

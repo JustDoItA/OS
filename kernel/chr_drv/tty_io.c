@@ -7,6 +7,7 @@
 #include <linux/tty.h>
 #include <termios.h>
 #include <signal.h>
+#include <asm/system.h>
 
 
 #define INTMASK (1<<(SIGINT-1))
@@ -95,6 +96,19 @@ void tty_intr(struct tty_struct *tty, int mask){
                 task[i]->signal |= mask; 
         }
     }
+}
+
+static void sleep_if_empty(struct tty_queue * queue){
+    cli();
+    while(!current->signal && EMPTY(*queue)){
+        interruptible_sleep_on(&queue->proc_list);
+    }
+    sti();
+}
+
+
+void wait_for_keypress(void){
+    sleep_if_empty(&tty_table[0].secondary);
 }
 
 void copy_to_cooked(struct tty_struct *tty){
@@ -187,7 +201,8 @@ void copy_to_cooked(struct tty_struct *tty){
         }
         PUTCH(c,tty->secondary);
     }
-    wake_up(&tty->secondary.proc_list);
+    //wake_up(&tty->secondary.proc_list);
+     //   rs_init();
 }
 
 /*tty中断处理调用函数-执行tty中断处理。
@@ -199,4 +214,9 @@ void copy_to_cooked(struct tty_struct *tty){
 
 void do_tty_interrupt(int tty){
     copy_to_cooked(tty_table + tty);
+}
+
+//字符设备初始化函数。空 为以后扩展做准备
+void chr_dev_init(){
+
 }

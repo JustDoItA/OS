@@ -97,25 +97,26 @@ set_e1:  movb $2, e0
 
 
 put_queue:
-    pushl %ecx
+    pushl %ecx          /*保持ecx，edx内容*/
     pushl %edx
     movl table_list,%edx
-    movl head(%edx), %ecx
-1:  movb %al,buf(%edx,%ecx)
-    incl %ecx
-    andl $size-1, %ecx
+    movl head(%edx), %ecx  /*取缓冲队列中的头指针*/
+1:  movb %al,buf(%edx,%ecx) /*将al中的字符放入缓冲队列头指针位置处*/
+    incl %ecx               /*头指针前移1字节*/
+    andl $size-1, %ecx      /*已缓冲区大小调整指针(若超出则返回缓冲区开始)*/
+    /*头指针=尾指针吗？*/
     cmpl tail(%edx),%ecx
-    je 3f
-    shrdl $8,%ebx,%eax
-    je 2f
-    shrl $8,%ebx
+    je 3f                   /*如果队列已满，则后面未放入的字符全部抛弃*/
+    shrdl $8,%ebx,%eax     /*将ebx中8位比特位右移8位到eax中，但ebx不变*/
+    je 2f                   /*还有字符码？若没有（等于0）则跳转*/
+    shrl $8,%ebx            /*将ebx中比特位右移8位，并跳转到标号1继续操作*/
     jmp 1b
-2:  movl %ecx,head(%edx)
-    movl proc_list(%edx),%ecx
-    testl %ecx, %ecx
-    je 3f
-    movl $0,(%ecx)
-3:  popl %edx
+2:  movl %ecx,head(%edx)     /*若已将所有字符都放入了队列，则保存头指针*/
+    movl proc_list(%edx),%ecx /*该队列的等待进程指针*/
+    testl %ecx, %ecx            /*检测任务结构指针是否位空（有等待该队列的进程吗？）*/
+    je 3f                   /*无，则跳转*/
+    movl $0,(%ecx)          /*有则置该进程为可运行就绪状态（唤醒该进程）*/
+3:  popl %edx               /*弹出保留的寄存器并返回*/
     popl %ecx
     ret
 
@@ -392,15 +393,17 @@ alt_map:
 #error "KBD-type not defined"
 #endif
 
-
+/*
+**用于处理普通键，即含义没有变化并且只有一个字符返回的键
+*/
 do_self:
-    lea alt_map,%ebx
+    lea alt_map,%ebx /*alt键同时按下时的映射表基址*/
     testb $0x20,mode
     jne 1f
     lea shift_map,%ebx
     testb $0x03,mode
     jne 1f
-    lea key_map,%ebx
+    lea key_map,%ebx /*使用普通映射表key_map*/
 1:
     movb (%ebx,%eax),%al
     orb %al,%al

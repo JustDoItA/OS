@@ -29,7 +29,8 @@ mktimes mktime.o : mktime.c ../include/time.h
 panic.s panic.o : panic.c ../include/linux/kernel.h
 printk.s printk.o : printk.c ../include/linux/kernel.h ../include/linux/stdarg.h
 sched.s sched.o : sched.c ../include/linux/sched.h ../include/linux/fs.h \
-	../include/linux/mm.h ../include/linux/kernel.h ../include/linux/head.h
+	../include/linux/mm.h ../include/linux/kernel.h ../include/linux/head.h \
+	../include/asm/system.h ../include/linux/fdreg.h
 signal.s signal.o : signal.c ../include/signal.h ../include/linux/sched.h \
 	../include/asm/segment.h ../include/linux/kernel.h
 traps.s traps.o : traps.c ../include/linux/head.h ../include/linux/sched.h \

@@ -1,6 +1,11 @@
 #include <linux/sched.h>
 #include <linux/kernel.h>
 #include <linux/sys.h>
+#include <linux/fdreg.h>
+
+#include <asm/system.h>
+#include <asm/io.h>
+
 #include <linux/mm.h>
 #include <signal.h>
 
@@ -12,8 +17,7 @@ void show_task(int nr, struct task_struct * p){
 
     printk("%d: pid=%d, state=%d ", nr, p->pid,p->state);
     i = 0;
-    while(i<j && !((char *)(p+1))[i]){
-        i++;
+    while(i<j && !((char *)(p+1))[i]){i++;
     }
     printk("%d (of %d) chars free in kernel stack \n\t",i,j);
 }
@@ -26,6 +30,12 @@ void show_stat(void){
         }
     }
 }
+
+#define LATCH (1193180/HZ)
+
+
+extern int timer_interrupt(void);
+extern int system_call(void);
 
 extern void schedule(void);
 
@@ -131,9 +141,208 @@ void sleep_on(struct task_struct **p){
     }
 }
 
+void interruptible_sleep_on(struct task_struct **p){
+    struct task_struct * tmp;
+
+    if(!p){
+        return;
+    }
+    if(current == &(init_task.task)){
+        //panic("task[0] trying to sleep");
+    }
+    tmp = *p;
+    *p = current;
+repeat: current->state = TASK_INTERRUPTIBLE;
+    schedule();
+    if(*p && *p != current){
+        (**p).state=0;
+        goto repeat;
+    }
+    *p = NULL;
+    if(tmp){
+        tmp->state=0;
+    }
+}
+
+//唤醒指定任务*p
 void wake_up(struct task_struct **p){
     if (p && *p){
-        (**p).state=0;
+        (**p).state=0; //置为就绪(可运行)状态
         *p=NULL;
     }
+}
+
+static struct task_struct * wait_motor[4] = {NULL,NULL,NULL,NULL};
+static int mon_timer[4] = {0,0,0,0};
+static int moff_timer[4] = {0,0,0,0};
+unsigned char current_DOR = 0x0C;
+
+int ticks_to_floppy_on(unsigned int nr){
+    extern unsigned char selected;
+    unsigned char mask = 0x01 << nr;
+
+    if(nr > 3){
+        //panic("floppy_on: nr>3");
+    }
+    moff_timer[nr]=10000;
+    cli();
+    mask |= current_DOR;
+    if(!selected){
+        mask &= 0xFC;
+        mask |= nr;
+    }
+    if(mask != current_DOR){
+        outb(mask,FD_DOR);
+
+        if((mask ^ current_DOR) & 0xf0){
+            mon_timer[nr] = HZ/2;
+        }else if(mon_timer[nr] < 2){
+            mon_timer[nr] = 2;
+        }
+        current_DOR = mask;
+    }
+    sti();
+    return mon_timer[nr];
+}
+
+void floppy_on(unsigned int nr){
+    cli();
+    while(ticks_to_floppy_on(nr)){
+        sleep_on(nr+wait_motor);
+    }
+    sti();
+}
+
+void floppy_off(unsigned int nr){
+    moff_timer[nr] = 3*HZ;
+}
+
+void do_floppy_timer(){
+    int i;
+    unsigned char mask = 0x10;
+
+    for(i=0; i<4; i++,mask <<=1){
+        if(!(mask & current_DOR)){
+            continue;
+        }
+        if(mon_timer[i]){
+            if(!--mon_timer[i]){
+                wake_up(i+wait_motor);
+            }
+        }else if(!moff_timer[i]){
+            current_DOR &= ~mask;
+            outb(current_DOR, FD_DOR);
+        }else {
+            moff_timer[i]--;
+        }
+    }
+}
+
+#define TIME_REQUESTS 64
+
+static struct timer_list {
+    long jiffies;
+    void (*fn)();
+    struct timer_list * next;
+} timer_list[TIME_REQUESTS], *next_timer=NULL;
+
+void add_timer(long jiffies, void (*fn)(void)){
+    struct timer_list * p;
+
+    if(!fn){
+        return;
+    }
+    cli();
+    if(jiffies <= 0){
+        (fn)();
+    }else {
+        for(p = timer_list; p < timer_list +TIME_REQUESTS; p++){
+            if(!p->fn){
+                break;
+            }
+        }
+    if(p >= timer_list + TIME_REQUESTS){
+        //panic("No more time requests free");
+    }
+    p->fn = fn;
+    p->jiffies = jiffies;
+    p->next = next_timer;
+    next_timer = p;
+    while(p->next && p->next->jiffies < p->jiffies){
+        p->jiffies -= p->next->jiffies;
+        fn = p->fn;
+        p->fn = p->next->fn;
+        p->next->fn = fn;
+        jiffies = p->jiffies;
+        p->jiffies = p->next->jiffies;
+        p->next->jiffies = jiffies;
+        p = p->next;
+    }
+    }
+    sti();
+}
+
+//时钟中断c处理函数，在kernel/system_call.s中的timer_interrupt
+//被调用，对于一个进程由于执行时间片用完时，则进行任务切换并
+//执行一个计时更新工作
+void do_timer(long cpl){
+    extern int beepcount;
+    extern void sysbeepstop(void);
+    if(beepcount){
+        if (!--beepcount){
+            sysbeepstop();
+        }
+    }
+    if(cpl){
+        current->utime++;
+    }else{
+        current->stime++;
+    }
+
+    if(next_timer){
+        next_timer->jiffies--;
+        while (next_timer && next_timer->jiffies <= 0 ){
+            void (*fn)(void);
+            fn = next_timer->fn;
+            next_timer->fn = NULL;
+            next_timer = next_timer->next;
+            (fn)();
+        }
+    }
+    if (current_DOR & 0xf0){
+        do_floppy_timer();
+    }
+    if((--current->counter)) return;
+    current->counter=0;
+    if(!cpl) return;
+    schedule();
+}
+
+void sched_init(){
+    int i;
+    struct desc_struct *p;
+
+    if (sizeof(struct sigaction) != 16){
+        //panic("Struct sigaction MUST be 16 bytes");
+    }
+    set_tss_desc(gdt+FIRST_TSS_ENTRY, &(init_task.task.tss));
+    set_ldt_desc(gdt+FIRST_LDT_ENTRY, &(init_task.task.ldt));
+    p = gdt+2+FIRST_TSS_ENTRY;
+    for(i=1 ;i<NR_TASKS; i++){
+        task[i] = NULL;
+        p->a = p->b=0;
+        p++;
+        p->a = p->b=0;
+        p++;
+    }
+
+    __asm__("pushfl ; andl $0xffffbfff,(%esp) ; popfl");
+    ltr(0);
+    lldt(0);
+    outb_p(0x36,0x43);
+    outb_p(LATCH & 0xff, 0x40);
+    outb(LATCH >> 8, 0x40);
+    set_intr_gate(0x20, &timer_interrupt);
+    outb(inb_p(0x21)&~0x01,0x21);
+    set_system_gate(0x80, &system_call);
 }
