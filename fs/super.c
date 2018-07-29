@@ -175,6 +175,13 @@ static struct super_block * read_super(int dev){
 
 }
 
+int sys_umount(){
+    return 0;
+}
+
+int sys_mount(){
+    return 0;
+}
 
 void mount_root(void){
     int i,free;

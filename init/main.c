@@ -116,10 +116,12 @@ int main(void){
 //init();
 
     if(!fork()){
-        init();
+    init();
     }
+    set_trap();
 
     for(;;){
+        set_trap();
         pause();
     }
 
@@ -135,6 +137,7 @@ static char * envp[] = {"HOME=/usr/root", NULL};
 void init(void){
     int pid, i;
 
+    //读取硬盘参数包括分区表信息并建立虚拟盘和安装根文件系统设备
     setup((void *) &drive_info);
     (void) open("/dev/tty0",O_RDWR, 0);
     (void) dup(0);

@@ -76,6 +76,7 @@ int execve(const char * filename, char **argv, char **envp);
 
 
 int open(const char * filename, int flag, ...);
+//int pause(void);
 //int fork(void);
 int write(int fileds,const char *buf, off_t count);
 

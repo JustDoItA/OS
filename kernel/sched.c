@@ -83,17 +83,24 @@ void math_state_restore(){
 
 void schedule(void){
     int i,next,c;
-    struct task_struct **p;
+    struct task_struct **p; //任务结构指针的指针
+    //检测alarm(进程的报警定时值),唤醒任何以已得到引号的可中断任务
 
+    //从任务数组中最后一个任务开始检测alarm
     for (p = &LAST_TASK ;p > &FIRST_TASK; --p){
         if(*p){
+            //如果任务的alarm时间已经(alarm<jiffies),则在信号位图中置SIGALRM信号,
+            //然后清alarm.jiffies 是系统从开机开始算起的滴答数(10ms/滴答)
             if ((*p)->alarm && (*p)->alarm < jiffies){
                 (*p)->signal |= (1<<(SIGALRM-1));
                 (*p)->alarm = 0;
             }
+            //如果信号位图中被阻塞的信号外还有其它信号，并且任务属于可中断状态，
+            //则任务置为就绪状态
+            //其中～(_BLOCKABLE & (*p)->blocked)用于忽略被阻塞信号，但SIGKILL和SIGSTOP 不能被阻塞
             if (((*p)->signal & ~(_BLOCKABLE & (*p)->blocked)) &&
                 (*p)->state==TASK_INTERRUPTIBLE){
-                (*p)->state=TASK_RUNNING;
+                (*p)->state=TASK_RUNNING; //置为就绪(可执行)状态
             }
         }
     }
@@ -103,6 +110,9 @@ void schedule(void){
         next = 0;
         i = NR_TASKS;
         p = &task[NR_TASKS];
+        //这段代码也是从任务数组中的最后一个任务开始循环处理，并跳过
+        //不含任务的数组槽，比较每个就绪状态任务的counter(任务运行时间的递减滴答计数)
+        //值，哪个大，运行时间还不长，next就指向那个任务号
         while(--i){
             if (!*--p){
                 continue;
@@ -110,18 +120,29 @@ void schedule(void){
             if((*p)->state == TASK_RUNNING && (*p)->counter > c){
                 c = (*p)->counter, next = i;
             }
+            //如果比较得出有counter值大于0的结果，则退出124行开始的循环
             if (c){
                 break;
             }
+            //否则就根据每个任务的优选权值，更新每个任务的counter值然后重新
+            //比较
+            //counter值的计算方式为counter = counter/2 + priority
             for (p = &LAST_TASK; p > &FIRST_TASK; --p){
                 if (*p){
                     (*p)->counter = ((*p)->counter >> 1)+(*p)->priority;
                 }
             }
         }
-        switch_to(next);
+        switch_to(next);//切换到任务号为next的任务，并运行
     }
 }
+
+int sys_pause(void){
+    current->state = TASK_INTERRUPTIBLE;
+    schedule();
+    return 0;
+}
+
 
 void sleep_on(struct task_struct **p){
     struct task_struct *tmp;
@@ -318,31 +339,60 @@ void do_timer(long cpl){
     schedule();
 }
 
+int sys_alarm(){
+    return 0;
+}
+
+int sys_getpid(){
+    return 0;
+}
+
+int sys_getuid(){
+    return 0;
+}
+
+//调度程序的初始化子程序
 void sched_init(){
     int i;
-    struct desc_struct *p;
+    struct desc_struct *p; //描述符表结构指针 每项8字节共256项
 
-    if (sizeof(struct sigaction) != 16){
+    if (sizeof(struct sigaction) != 16){//sigaction 是存放有关信号状态的结构
         //panic("Struct sigaction MUST be 16 bytes");
     }
+    //设置初始话任务(任务0)的任务状态段描述符和局部数据表描述符
+    //(include/asm/system.h) FIRST_TSS_ENTRY 4,表示在描述符表的索引是4
+    //因为gdt是desc_struct类型(8字节),刚好是一个描述符的长度，所以这里的
+    //gdt+4可以理解为gdt[4],刚好对应的是TSS0
     set_tss_desc(gdt+FIRST_TSS_ENTRY, &(init_task.task.tss));
     set_ldt_desc(gdt+FIRST_LDT_ENTRY, &(init_task.task.ldt));
+    //清任务数组和描述符表项(注意i=1开始，所以初始化任务的描述符还在)
+    //p指向GDT表0号任务的下一个位置,即GDT表的第6项
     p = gdt+2+FIRST_TSS_ENTRY;
     for(i=1 ;i<NR_TASKS; i++){
         task[i] = NULL;
+        //重复两次是因为每个进程对于一个LDT与一个TSS
         p->a = p->b=0;
         p++;
         p->a = p->b=0;
         p++;
     }
 
-    __asm__("pushfl ; andl $0xffffbfff,(%esp) ; popfl");
-    ltr(0);
-    lldt(0);
+    //清除标志寄存器中的位NT，
+    //NT标志位用于控制程序的递归调用，当NT置位时，那么当前前中断任务执行iret
+    //指令时就会引起任务切换，NT指出TSS中的black_link字段是否有效
+    __asm__("pushfl ; andl $0xffffbfff,(%esp) ; popfl");//复位NT标志
+    ltr(0); //将任务0的TSS加载到任务寄存器tr
+    lldt(0); //将局部描述符表加载到局部描述符表寄存器
+    //注意：将GDT中相应LDT描述符加载到ldtr，只明确加载这一次，以后新任务LDT的加
+    //载，是CUP根据TSS中的LDT项自动加载
+    //下代码用于初始化8253定时器
     outb_p(0x36,0x43);
-    outb_p(LATCH & 0xff, 0x40);
-    outb(LATCH >> 8, 0x40);
+    outb_p(LATCH & 0xff, 0x40); //LSB 定时值低字节
+    outb(LATCH >> 8, 0x40);     //MSB 定时值高字节
+    //设置时钟中断处理程序句柄(设置时钟中断门)
     set_intr_gate(0x20, &timer_interrupt);
+    //修改中断控制器屏蔽码，允许时钟中断
     outb(inb_p(0x21)&~0x01,0x21);
+    //设置系统调用中断门
     set_system_gate(0x80, &system_call);
 }

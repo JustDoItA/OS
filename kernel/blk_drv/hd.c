@@ -42,6 +42,13 @@ static struct hd_struct{
 extern void hd_interrupt(void);
 extern void rd_load(void);
 
+
+//下面该函数只在初始化时被调用一次。用静态变量callable作为可以调用标志
+//该函数的参数由初始话程序init/main.c的init子程序设置为指向0x90080处，此处存放
+//setup.s程序从BIOS取得的2个硬盘的基本参数表(32字节).硬盘参数表信息见下面列表后
+//的说明
+//本函数的主要功能是读写CMOS和硬盘参数表信息，用于设置硬盘分区结构hd,并加载RAM
+//虚拟盘和根文件系统
 int sys_setup(void * BIOS){
     static int callable = 1;
     int i,drive;

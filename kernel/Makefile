@@ -15,7 +15,7 @@ CPP = gcc -E -nostdinc -I../include
 .c.o:
 	$(CC) $(CFLAGS) -c -o $*.o $<
 OBJS = sched.o system_call.o printk.o mktime.o panic.o signal.o fork.o exit.o \
-	   traps.o asm.o vsprintf.o#sys.o
+	   traps.o asm.o vsprintf.o sys.o
 
 kernel.o : $(OBJS)
 	$(LD) -r -o kernel.o $(OBJS)
@@ -35,5 +35,5 @@ signal.s signal.o : signal.c ../include/signal.h ../include/linux/sched.h \
 	../include/asm/segment.h ../include/linux/kernel.h
 traps.s traps.o : traps.c ../include/linux/head.h ../include/linux/sched.h \
 	../include/linux/kernel.h ../include/asm/system.h ../include/asm/io.h
-vsprintf.s vsprintf.o : vsprintf.c ../include/string.h ../include/stdarg.h \
-#sys.s sys.o : sys.c ../include/linux/sys.h
+vsprintf.s vsprintf.o : vsprintf.c ../include/string.h ../include/stdarg.h
+sys.s sys.o : sys.c ../include/linux/sys.h

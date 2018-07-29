@@ -3,8 +3,9 @@ AS = as
 LD = ld
 LDFLAGS = -M -x
 CC = gcc
+#加了-g3 -gdwarf-2 ,会将扩展的debug信息编译进二进制文件里面包括宏定义信息
 CFLAGS = -Wall -O -g -fstrength-reduce -fomit-frame-pointer \
-		-finline-functions -nostdinc -I../include
+		-finline-functions -g3 -gdwarf-2 -nostdinc -I../include
 CPP = gcc -E -nostdinc -I../include
 .c.s:
 	$(CC) $(CFLAGS) -S -o $*.o $<

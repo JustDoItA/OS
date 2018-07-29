@@ -25,7 +25,12 @@ extern void sched_init(void);
 extern void trap_init(void);
 extern void panic(const char * str);
 
-
+//用于设置第一个任务表
+        /*tss*/ 
+        /*esp0=PAGE_SIZE+(long)&init_task 内核态堆栈指针初始化为页面的最后*/ 
+        /*ss0=0x10 内核堆态堆栈的段选择符,指向系统数据段描述符,进程0的进程控制*/ 
+        /*块和内核态堆栈都在system模块中*/ 
+        /*cr3=(long)&pg_dir页目录表,其实linux0.11所有进程共享一个页目录*/ 
 #define INIT_TASK \
     /*state etc*/    { 0,15,15, \
         /*signals*/  0,{{},},0, \
@@ -37,14 +42,14 @@ extern void panic(const char * str);
         /*fs info*/   -1,0022,NULL,NULL,NULL,0, \
         /*filp*/      {NULL,}, \
         {\
-        {0,0}, \
-        /*ldt*/  {0x9f,0xc0fa00}, \
-                 {0x9f,0xc0f200}, \
+        /*ldt第0项为空*/ {0,0}, \
+        /*ldt 代码段长640k,基地址0，G=1,D=1,DPL=3,P=1,TYPE=0x0a*/ {0x9f,0xc0fa00}, \
+        /*ldt 数据段段长640k,基地址0，G=1,D=1,DPL=3,P=1,TYPE=0x02*/ {0x9f,0xc0f200}, \
         }, \
-        /*tss*/ {0,PAGE_SIZE+(long)&init_task,0x10,0,0,0,0,(long)&pg_dir, \
+        {0,PAGE_SIZE+(long)&init_task,0x10,0,0,0,0,(long)&pg_dir, \
                  0,0,0,0,0,0,0,0, \
                  0,0,0x17,0x17,0x17,0x17,0x17,0x17, \
-                 _LDT(0),0x80000000, \
+                 /*ldt表选择符指向gdt中LDT0处*/ _LDT(0),0x80000000, \
                  {} \
                  }, \
 }
@@ -65,8 +70,10 @@ extern void wake_up(struct task_struct ** p);
 
 #define FIRST_TSS_ENTRY 4
 #define FIRST_LDT_ENTRY (FIRST_TSS_ENTRY+1)
+//宏定义，计算在全局表中第n个任务的TSS描述符的索引号(选择符)
 #define _TSS(n) ((((unsigned long) n)<<4)+(FIRST_TSS_ENTRY<<3))
 #define _LDT(n) ((((unsigned long) n)<<4)+(FIRST_LDT_ENTRY<<3))
+//宏定义，加载第n个任务寄存器tr
 #define ltr(n) __asm__("ltr %%ax" ::"a" (_TSS(n)))
 #define lldt(n) __asm__("lldt %%ax"::"a" (_LDT(n)))
 
@@ -77,13 +84,25 @@ extern void wake_up(struct task_struct ** p);
             :"=a" (n) \
             :"a" (0),"i" (FIRST_TSS_ENTRY<<3))
 
+//将切换当前任务到nr,即n.首先检测任务n是不是当前任务
+//如果是则什么也不做退出,如果我们切换到任务最近(上次运行)使用
+//过协处理器的话，则还需要复位控制寄存器cr0中的TS标志
+
+// 输入：%0-新TSS的偏移地址(*&_tmp.a)
+// %1 存放新TSS的选择符(e&_tmp.b)
+// dx 新任务n的选择符 ecx 新任务指针task[n]
+// 其中临时数据结果__tmp中a的值是32位偏移值,b是新TSS的选择符
+// 在任务切换时，a值没用(忽略).在判断新任务上次执行是否使用过
+// 协处理器时，是通过将新任务状态段的地址与保存在last_task_used_math
+// 变量中使用过协处理器任务状态段的地址进行比较而做出的
+// dx = 48
 #define switch_to(n){\
     struct {long a,b;} __tmp; \
     __asm__("cmpl %%ecx,current\n\t"\
             "je 1f\n\t"\
             "movw %%dx,%1\n\t" \
             "xchgl %%ecx,current\n\t" \
-            "ljmp *%0\n\t" \
+            "ljmp %0\n\t" \
             "cmpl %%ecx,last_task_used_math\n\t" \
             "jne 1f\n\t" \
             "clts\n" \
@@ -122,14 +141,17 @@ struct i387_struct {
 };
 
 struct tss_struct {
-    long back_link;
-    long esp0;
-    long ss0;
-    long esp1;
-    long ss1;
-    long esp2;
-    long ss2;
-    long cr3;
+    long back_link; //保存前一个TSS段选择子，使用call指令切换寄存器时由CPU填写
+    //这6个是固定不变的，用于提权，CPU切换栈的时候用
+    long esp0; //保存0环栈指针
+    long ss0; //保存0环栈选择子
+    long esp1;//保存1环栈指针
+    long ss1; //保存1环段选择子
+    long esp2;//用于保存2环栈指针
+    long ss2; //用于保存2环栈指针
+    //下面这些都是用来做切换寄存器值用的，切换的时候由
+    //CPU自动填写
+    long cr3; 
     long eip;
     long eflags;
     long eax,ecx,edx,ebx;
@@ -222,6 +244,10 @@ struct task_struct {
 
 #define get_base(ldt) _get_base(((char *)&(ldt)))
 
+//取段选择符segment的段长值
+//%0 存放段长值(字节数) %1 段选择符segment
+//lsll加载段界限的指令，把segment段描述符中的段界限装入某个寄存器(这个寄存器与
+//__limit结合),函数返回__limit加1，即段长
 #define get_limit(segment)({      \
     unsigned long __limit; \
     __asm__("lsll %1,%0\n\tincl %0":"=r" (__limit):"r" (segment));    \

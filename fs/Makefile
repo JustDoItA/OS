@@ -13,7 +13,8 @@ CPP = gcc -E -nostdinc -I../include
 	$(AS) -c -o $*.o $<
 .c.o:
 	$(CC) $(CFLAGS) -c -o $*.o $<
-OBJS = super.o buffer.o inode.o truncate.o bitmap.o
+OBJS = super.o buffer.o inode.o truncate.o bitmap.o read_write.o open.o namei.o \
+	   stat.o
 
 fs.o: $(OBJS)
 	$(LD) -r -o fs.o $(OBJS)
@@ -28,3 +29,7 @@ inode.o : inode.c ../include/linux/fs.h ../include/linux/kernel.h \
 	../include/string.h ../include/sys/stat.h
 truncate.o : truncate.c ../include/sys/stat.h ../include/linux/sched.h
 bitmap.o : bitmap.c ../include/linux/fs.h ../include/string.h
+read_write.o : read_write.c
+open.o : open.c
+namei.o : namei.c
+stat.o : stat.c

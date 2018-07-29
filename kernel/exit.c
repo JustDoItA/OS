@@ -11,3 +11,7 @@ int do_exit(long code){
 int sys_exit(int error_code){
     return do_exit((error_code&0xff)<<8);
 }
+
+int sys_waitpid(){
+    return 0;
+}
